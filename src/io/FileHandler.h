@@ -7,7 +7,7 @@
 #include <sstream>
 #include <string>
 
-namespace { namespace io {
+namespace io {
 
 // ==================================================================
 // ==================================================================
@@ -50,7 +50,5 @@ public:
 }; // class FileHandler
 
 } // namespace io
-
-} // namespace
 
 #endif // FILE_HANDLER_H

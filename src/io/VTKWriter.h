@@ -16,7 +16,7 @@
 using Device = Kokkos::DefaultExecutionSpace;
 //#include "shared/kokkos_shared.h"
 
-namespace { namespace io {
+namespace io {
 
 enum class VTK_WRITE_ENUM {
 
@@ -479,7 +479,7 @@ void VTKWriter::write_appended_binary_geometry(std::vector<Point<3> >& nodes_loc
    */
   {
     std::vector<unsigned char> celltypes;
-
+    
     // 9 means "Quad" - 12 means "Hexahedron"
     int cellType = (dim==2) ? 9 : 12;
 
@@ -497,7 +497,5 @@ void VTKWriter::write_appended_binary_geometry(std::vector<Point<3> >& nodes_loc
 } // write_appended_binary_geometry
 
 } // namespace io
-
-} // namespace
 
 #endif // VTK_WRITER_H

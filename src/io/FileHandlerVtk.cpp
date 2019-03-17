@@ -1,6 +1,6 @@
 #include "io/FileHandlerVtk.h"
 
-namespace { namespace io {
+namespace io {
 
 // =======================================================
 // =======================================================
@@ -71,4 +71,3 @@ std::string FileHandlerVtk::getFullPath()
 
 } // namespace io
 
-} // namespace

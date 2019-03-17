@@ -709,7 +709,7 @@ void dump_vtk_2d(const std::string& filename,
     
   }
 
-  ::io::VTKWriter vtkWriter(nbCells);
+  io::VTKWriter vtkWriter(nbCells);
   vtkWriter.open_file();
   vtkWriter.write_header();
   vtkWriter.write_metadata(0,0.0);

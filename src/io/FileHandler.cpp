@@ -1,6 +1,6 @@
 #include "io/FileHandler.h"
 
-namespace { namespace io {
+namespace io {
 
 // =======================================================
 // =======================================================
@@ -45,4 +45,3 @@ std::string FileHandler::getFullPath()
 
 } // namespace io
 
-} // namespace

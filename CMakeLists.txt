@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.3)
 
-project(AMR_mandelbrot CXX)
+project(AMR_mandelbrot CXX C)
 
 # C++11 is for Kokkos
 set(CMAKE_CXX_STANDARD 11)

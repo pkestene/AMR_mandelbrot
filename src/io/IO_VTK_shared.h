@@ -4,7 +4,7 @@
 #include <string>
 #include <fstream>
 
-namespace { namespace io {
+namespace io {
 
 /**
  * Write VTK unstructured grid header.
@@ -28,7 +28,5 @@ void close_vtu_grid(std::ostream& outFile);
 void write_vtu_footer(std::ostream& outFile);
 
 } // namespace io
-
-} // namespace
 
 #endif // IO_VTK_SHARED_H_

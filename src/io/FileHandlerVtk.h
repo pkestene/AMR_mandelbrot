@@ -3,7 +3,7 @@
 
 #include "io/FileHandler.h"
 
-namespace { namespace io {
+namespace io {
 
 // =======================================================
 // =======================================================
@@ -35,7 +35,5 @@ public:
 }; // class FileHandlerVtk
 
 } // namespace io
-
-} // namespace
 
 #endif // FILE_HANDLER_VTK_H

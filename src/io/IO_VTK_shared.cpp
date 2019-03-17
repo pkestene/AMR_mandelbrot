@@ -2,7 +2,7 @@
 
 #include "IO_VTK_shared.h"
 
-namespace { namespace io {
+namespace io {
 
 // =======================================================
 // =======================================================
@@ -87,4 +87,3 @@ void write_vtu_footer(std::ostream& outFile)
 
 } // namespace io
 
-} // namespace

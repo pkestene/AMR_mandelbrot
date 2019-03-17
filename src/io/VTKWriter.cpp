@@ -6,7 +6,7 @@
 
 #include "io/IO_VTK_shared.h"
 
-namespace { namespace io {
+namespace io {
 
 // =======================================================
 // =======================================================
@@ -375,4 +375,3 @@ int VTKWriter::write_base64_binary_data(const char* numeric_data, size_t byte_le
 
 } // namespace io
 
-} // namespace
