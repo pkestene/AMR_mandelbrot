@@ -1,0 +1,5 @@
+*.o
+*~
+compile_commands.json
+build
+build_*
