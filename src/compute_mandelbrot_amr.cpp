@@ -7,8 +7,6 @@
  * - key is actually the Morton key (using type morton_key_t)
  * - value is a structure containing different fields.
  *
- * \sa test_unordered_map_io3.cpp
- *
  */
 #include <cstdio>
 #include <cstdlib>
@@ -30,7 +28,6 @@
 #include <Kokkos_Sort.hpp>
 
 #include "shared/enums.h"
-//#include "shared/kokkos_shared.h"
 
 #include "shared/morton_utils.h"
 #include "shared/amr_key.h"
@@ -70,7 +67,7 @@ double scaleY(double y) {
   return ymin + deltaY * y;
 }
 
-/// refinement threashold
+/// refinement threshold
 static constexpr double epsilon = 0.01;
 
 // ========================================================================
@@ -348,7 +345,7 @@ struct Refine
       Kokkos::parallel_for(_mandelbrotMap.capacity(), functor);
       
       if (_mandelbrotMap.failed_insert())
-	printf("Something went wrong in refinement operation\n");
+	printf("====> Something went wrong in refinement operation (you probably need to resize up the hash table)\n");
       
       //
       // step2: remove old coarse cells
@@ -432,7 +429,7 @@ struct Refine
       // compute nb iter at cell center
       double datac = compute_nb_iters(x,y);
 
-      // compute nb iter at the corners
+      // compute nb iter at sub-cell centers
       double data[4], average=0.0;
       for (int index=0; index<4; ++index) {
 
@@ -519,7 +516,7 @@ struct Refine
 	value.status = CELL_TO_BE_REMOVED;
 	mandelbrotMap.value_at(i) = value;
 	
-      } // end if (r2<R2)
+      } // end if refinement needed
 
     } // end status != CELL_UNINITIALIZED
     

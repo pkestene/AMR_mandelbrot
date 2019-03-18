@@ -16,8 +16,6 @@
 
 #include <cstdint>
 
-namespace {
-
 /**
  * Cell status.
  *
@@ -196,7 +194,5 @@ static uint64_t encode_tree(int treeId)
   return res;
   
 } // encode_tree
-
-} // namespace 
 
 #endif // SHARED_KEY_TYPE_H
