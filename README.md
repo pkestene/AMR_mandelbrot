@@ -37,8 +37,6 @@ make
 
 Optionally, you can (recommended) activate HWLOC support by turning ON the flag KOKKOS_ENABLE_HWLOC.
 
-Optionally, you can build with openmp kokkos backend and p4est (must have been built, and loaded in your environment, i.e. at least variable P4EST_ROOT must be set to the top-level directory where p4est was installed).
-
 ```bash
 ccmake -DKOKKOS_ENABLE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release -DKOKKOS_ENABLE_HWLOC=ON ..
 ```
