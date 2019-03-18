@@ -22,7 +22,7 @@ git clone --recurse-submodules https://github.com/pkestene/AMR_mandelbrot.git
 
 Kokkos is built as part of this project with the cmake build system.
 
-## build khamr
+## build the code
 
 ### build for Kokkos/OpenMP execution
 
