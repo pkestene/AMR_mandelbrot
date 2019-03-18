@@ -2,6 +2,14 @@
 
 Compute Mandelbrot Set using adaptive mesh refinement technique and C++/kokkos library for multi-architecture execution.
 
+Example of Mandelbrot set with level_min=6 and level_max=11
+
+```bash
+./compute_mandelbrot_amr 6 11
+```
+
+![mandelbrot set](https://github.com/pkestene/AMR_mandelbrot/blob/master/mandelbrot_level_6_11.png)
+
 # How to build ?
 
 ## Get the sources
