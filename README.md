@@ -1,2 +1,59 @@
 # AMR_mandelbrot
-Compute Mandelbrot Set using adaptive mesh refinement
+
+Compute Mandelbrot Set using adaptive mesh refinement technique and C++/kokkos library for multi-architecture execution.
+
+# How to build ?
+
+## Get the sources
+
+Make sure to clone this repository recursively, this will also download kokkos source as a git submodule.
+
+```bash
+git clone --recurse-submodules https://github.com/pkestene/AMR_mandelbrot.git
+```
+
+Kokkos is built as part of this project with the cmake build system.
+
+## build khamr
+
+### build for Kokkos/OpenMP execution
+
+To build kokkos/OpenMP backend
+
+```bash
+mkdir build_openmp; cd build_openmp
+ccmake -DKOKKOS_ENABLE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release ..
+make
+```
+
+Optionally, you can (recommended) activate HWLOC support by turning ON the flag KOKKOS_ENABLE_HWLOC.
+
+Optionally, you can build with openmp kokkos backend and p4est (must have been built, and loaded in your environment, i.e. at least variable P4EST_ROOT must be set to the top-level directory where p4est was installed).
+
+```bash
+ccmake -DKOKKOS_ENABLE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release -DKOKKOS_ENABLE_HWLOC=ON ..
+```
+
+### build for Kokkos/Cuda
+
+Obviously, you need to have Nvidia/CUDA driver and toolkit installed on your platform.
+Then you need to
+
+ 1. tell cmake to use kokkos compiler wrapper for cuda:
+ 
+    ```shell
+    export CXX=/complete/path/to/kokos/bin/nvcc_wrapper
+    ```
+    
+ 2. activate CUDA backend in the ccmake interface. 
+    * Just turn on KOKKOS_ENABLE_CUDA 
+    * select cuda architecture, e.g. set KOKKOS_ARCH to Kepler37 (for Nvidia K80 boards)
+    
+    ```bash
+    # example build for cuda
+    mkdir build_cuda; cd build_cuda
+    ccmake -DKOKKOS_ENABLE_CUDA=ON -DKOKKOS_ARCK=Kepler37 -DKOKKOS_ENABLE_CUDA_LAMBDA=ON -DKOKKOS_ENABLE_HWLOC=ON ..
+    make
+    ```
+
+
