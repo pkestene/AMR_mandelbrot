@@ -7,7 +7,16 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 #
-# sources
+# Make sure Kokkos is available (as a git submodule)
+#
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/kokkos/Makefile.kokkos")
+  execute_process(
+    COMMAND git submodule update --init --recursive
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+endif()
+
+#
+# sources to build
 #
 
 # first build kokkos
