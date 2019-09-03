@@ -1,7 +1,9 @@
 # AMR_mandelbrot
 
-Compute Mandelbrot Set using adaptive mesh refinement technique and C++/kokkos library for multi-architecture execution.
-This is not intended to be efficient computation, but just a simple illustrative example of use of class Kokkos::UnorderedMap container (multi-architecture hash map data container).
+Compute Mandelbrot Set using adaptive mesh refinement technique and [C++/kokkos](https://github.com/kokkos/kokkos/) library for multi-architecture execution. 
+This is not intended to be efficient computation, but just a simple illustrative example of use of class Kokkos::UnorderedMap container (multi-architecture hash map data container). Mandelbrot set is computed iteratively, refined cells are inserted into the hashmap based data structure.
+
+The following source code is self-contained; C++/kokkos library sources are included as a git submodule.
 
 Example of Mandelbrot set with level_min=6 and level_max=11
 
