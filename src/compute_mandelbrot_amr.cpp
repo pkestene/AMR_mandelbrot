@@ -171,7 +171,7 @@ struct ComputeMapSize
     uint32_t size = 0;
     ComputeMapSize functor(_mandelbrotMap);
     Kokkos::parallel_reduce(_mandelbrotMap.capacity(), functor, size);
-    execution_space::fence();
+    execution_space().fence();
     return size;
   }
   
@@ -658,7 +658,7 @@ void dump_vtk_2d(const std::string& filename,
   // get nodes position
   Kokkos::parallel_for
     ("get nodes positions",
-     keyVec.dimension_0(), KOKKOS_LAMBDA (const int& i) {
+     keyVec.extent(0), KOKKOS_LAMBDA (const int& i) {
       
       amr_key_t key = keyVec(i);
       uint64_t morton = key.get_morton();

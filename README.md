@@ -33,14 +33,14 @@ To build kokkos/OpenMP backend
 
 ```bash
 mkdir build_openmp; cd build_openmp
-ccmake -DKOKKOS_ENABLE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release ..
+ccmake -DKokkos_ENABLE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
 
 Optionally, you can (recommended) activate HWLOC support by turning ON the flag KOKKOS_ENABLE_HWLOC.
 
 ```bash
-ccmake -DKOKKOS_ENABLE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release -DKOKKOS_ENABLE_HWLOC=ON ..
+ccmake -DKokkos_ENABLE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release -DKokkos_ENABLE_HWLOC=ON ..
 ```
 
 ### build for Kokkos/Cuda
@@ -55,13 +55,13 @@ Then you need to
     ```
     
  2. activate CUDA backend in the ccmake interface. 
-    * Just turn on KOKKOS_ENABLE_CUDA 
-    * select cuda architecture, e.g. set KOKKOS_ARCH to Kepler37 (for Nvidia K80 boards)
+    * Just turn on Kokkos_ENABLE_CUDA 
+    * select cuda architecture, e.g. set Kokkos_ARCH_KEPLER37=ON (for Nvidia K80 boards)
     
     ```bash
     # example build for cuda
     mkdir build_cuda; cd build_cuda
-    ccmake -DKOKKOS_ENABLE_CUDA=ON -DKOKKOS_ARCK=Kepler37 -DKOKKOS_ENABLE_CUDA_LAMBDA=ON -DKOKKOS_ENABLE_HWLOC=ON ..
+    ccmake -DKokkos_ENABLE_CUDA=ON -DKokkos_ARCH_KEPLER37=ON -DKokkos_ENABLE_CUDA_LAMBDA=ON -DKokkos_ENABLE_HWLOC=ON ..
     make
     ```
 

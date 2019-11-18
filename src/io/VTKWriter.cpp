@@ -241,7 +241,7 @@ void VTKWriter::write_cell_data(const std::string& dataname,
 
   if ( vtk_binary_enabled() ) {
     
-    write_base64_binary_data(reinterpret_cast<const char *>( cell_data.ptr_on_device() ),
+    write_base64_binary_data(reinterpret_cast<const char *>( cell_data.data() ),
 			     sizeof(double)*m_nbCells);
     
     m_out_file << "\n";
