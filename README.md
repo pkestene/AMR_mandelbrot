@@ -37,7 +37,7 @@ ccmake -DKokkos_ENABLE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
 
-Optionally, you can (recommended) activate HWLOC support by turning ON the flag KOKKOS_ENABLE_HWLOC.
+Optionally, you can (recommended) activate HWLOC support by turning ON the flag Kokkos_ENABLE_HWLOC.
 
 ```bash
 ccmake -DKokkos_ENABLE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release -DKokkos_ENABLE_HWLOC=ON ..
