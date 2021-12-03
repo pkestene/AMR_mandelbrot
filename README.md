@@ -48,21 +48,22 @@ ccmake -DKokkos_ENABLE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release -DKokkos_ENABLE_HWLO
 Obviously, you need to have Nvidia/CUDA driver and toolkit installed on your platform.
 Then you need to
 
- 1. tell cmake to use kokkos compiler wrapper for cuda:
+ 1. (optionnal / deprecated) tell cmake to use kokkos compiler wrapper for cuda:
  
     ```shell
+    # this is deprecated since Kokkos will infer the use of
+    # this compiler wrapper when enabling CUDA backend
     export CXX=/complete/path/to/kokos/bin/nvcc_wrapper
     ```
     
- 2. activate CUDA backend in the ccmake interface. 
-    * Just turn on Kokkos_ENABLE_CUDA 
-    * select cuda architecture, e.g. set Kokkos_ARCH_KEPLER37=ON (for Nvidia K80 boards)
+ 2. activate CUDA backend in the ccmake interface.
+    * Just turn on Kokkos_ENABLE_CUDA
+    * select cuda architecture, e.g. set Kokkos_ARCH_TURING75=ON (for Nvidia Turing boards)
     
     ```bash
     # example build for cuda
     mkdir build_cuda; cd build_cuda
-    ccmake -DKokkos_ENABLE_CUDA=ON -DKokkos_ARCH_KEPLER37=ON -DKokkos_ENABLE_CUDA_LAMBDA=ON -DKokkos_ENABLE_HWLOC=ON ..
+    ccmake -DKokkos_ENABLE_CUDA=ON -DKokkos_ARCH_TURING75=ON -DKokkos_ENABLE_CUDA_LAMBDA=ON -DKokkos_ENABLE_HWLOC=ON ..
     make
     ```
-
 

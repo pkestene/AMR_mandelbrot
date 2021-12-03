@@ -1,10 +1,24 @@
-cmake_minimum_required(VERSION 3.3)
+# use minimum version required by Kokkos
+cmake_minimum_required(VERSION 3.16)
 
 project(AMR_mandelbrot CXX C)
 
-# C++11 is for Kokkos
-set(CMAKE_CXX_STANDARD 11)
+# always export compile commands database
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# C++14 is for Kokkos
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(default_build_type "Release")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+      STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+    "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
 
 #
 # Make sure Kokkos is available (as a git submodule)
@@ -16,7 +30,7 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/kokkos/Makefile.kokkos")
 endif()
 
 #
-# sources to build
+# sources
 #
 
 # first build kokkos
@@ -36,10 +50,18 @@ message("  C++ Compiler : ${CMAKE_CXX_COMPILER_ID} "
                          "${CMAKE_CXX_COMPILER_VERSION} "
                          "${CMAKE_CXX_COMPILER_WRAPPER}")
 message("                 ${CMAKE_CXX_COMPILER}")
-message("  Kokkos OpenMP enabled : ${Kokkos_ENABLE_OPENMP}")
-message("  Kokkos CUDA   enabled : ${Kokkos_ENABLE_CUDA}")
+message("  Kokkos_ENABLE_OPENMP = ${Kokkos_ENABLE_OPENMP}")
+message("  Kokkos_ENABLE_CUDA   = ${Kokkos_ENABLE_CUDA}")
 if (Kokkos_ENABLE_CUDA)
-  message("  Kokkos CUDA   Lambda  : ${Kokkos_ENABLE_CUDA_LAMBDA}")
-  message("  Kokkos CUDA   flags   : ${KOKKOS_CUDA_OPTIONS}")
+  message("  Kokkos_ENABLE_CUDA_LAMBDA    = ${Kokkos_ENABLE_CUDA_LAMBDA}")
+  message("  Kokkos_ENABLE_CUDA_CONSTEXPR = ${Kokkos_ENABLE_CUDA_CONSTEXPR}")
+  message("  Kokkos_ENABLE_CUDA_UVM       = ${Kokkos_ENABLE_CUDA_UVM}")
+  message("  Kokkos CUDA   flags          = ${KOKKOS_CUDA_OPTIONS}")
 endif(Kokkos_ENABLE_CUDA)
-message("  Kokkos HWLOC  enabled : ${Kokkos_ENABLE_HWLOC}")
+message("  Kokkos_ENABLE_HWLOC  = ${Kokkos_ENABLE_HWLOC}")
+
+if (Kokkos_ENABLE_CUDA)
+  message("  CUDA Compiler      : ${CMAKE_CUDA_COMPILER}")
+  message("  CUDA Compiler exec : ${CUDA_NVCC_EXECUTABLE}")
+  message("  CUDA Compile flags : ${CUDA_NVCC_FLAGS}")
+endif(Kokkos_ENABLE_CUDA)

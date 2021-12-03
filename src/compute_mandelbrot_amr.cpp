@@ -92,7 +92,7 @@ compute_nb_iters (double cx, double cy)
   double tmp;
 
   while (j <= NMAX and norm < 4) {
-    tmp  = (zx*zx) - (zy*zy) + cx; // Real part 
+    tmp  = (zx*zx) - (zy*zy) + cx; // Real part
     zy   = (2.*zx*zy) + cy;        // Imag part
     zx   = tmp;
     j++;
@@ -151,7 +151,7 @@ using MandelbrotMap = Kokkos::UnorderedMap<amr_key_t, metadata_t, Device>;
 /**
  * Functor to compute a Kokkos::UnorderedMap size (number of valid entries).
  *
- * Not really needed, since the functionnality already exists as 
+ * Not really needed, since the functionnality already exists as
  * UnorderedMap method named size().
  *
  */
@@ -190,7 +190,7 @@ struct ComputeMapSize
   void init( uint32_t & update ) const { update = 0 ; }
 
   KOKKOS_INLINE_FUNCTION
-  void join( volatile       uint32_t & update , 
+  void join( volatile       uint32_t & update ,
 	     volatile const uint32_t & input ) const { update += input ; }
   
 }; // struct ComputeMapSize
@@ -203,7 +203,7 @@ struct ComputeMapSize
  *
  * kind of bootstrap.
  *
- * Remind that 
+ * Remind that
  *  - amr_key_t    encodes space + level + tree
  *  - morton_key_t encodes space + tree
  * Please note that they use very different encoding.
@@ -261,8 +261,8 @@ struct FillCoarseMap
     
     mandelbrotMap.insert( key, value );
     
-  } // operator()  
-  
+  } // operator()
+
 }; // struct FillCoarseMap
 
 // =========================================================================
@@ -272,8 +272,8 @@ struct FillCoarseMap
  *
  * the refinement criterium is adapted from the Mariani-Silver Algorithm, i.e.
  * for each each we compare the value at center with the average pixel of the
- * four sub-cell; if they agree up to epsilon, we do not refine; if they 
- * are strongly different, it means we need to refine (so new cells are 
+ * four sub-cell; if they agree up to epsilon, we do not refine; if they
+ * are strongly different, it means we need to refine (so new cells are
  * inserted, and parent cell is removed).
  */
 struct Refine
@@ -371,7 +371,7 @@ struct Refine
       if (VERBOSE) std::cout << "is data map erasable ? " << _mandelbrotMap.erasable() << "\n";
 
       //
-      // step3: reset cell status 
+      // step3: reset cell status
       //
       // VERY strange mandelbrotMap.size() gives the wrong result ?! To be analyzed
       //int map_size = _mandelbrotMap.size();
@@ -382,7 +382,7 @@ struct Refine
 
       Kokkos::fence();
       
-    } // end for iter    
+    } // end for iter
     
   } // apply
   
@@ -442,7 +442,7 @@ struct Refine
       }
       average /= 4;
 
-      bool refinement_needed = false;      
+      bool refinement_needed = false;
       if ( datac / average > 1+epsilon or
 	   datac / average < 1-epsilon )
 	refinement_needed = true;
@@ -530,13 +530,13 @@ struct Refine
     amr_key_t key = mandelbrotMap.key_at(i);
     metadata_t value = mandelbrotMap.value_at(i);
 
-    CellStatus status = value.status; 
+    CellStatus status = value.status;
     
     // if value is CELL_TO_BE_REMOVED, then call erase
     // remove cell at coarse level (erase method returns true / false depending
     // if current kernel is in between calls to begin_erase / end_erase
     if (status == CELL_TO_BE_REMOVED) {
-      mandelbrotMap.erase(key); 
+      mandelbrotMap.erase(key);
     }
     
   } // delete_old_cells
@@ -548,7 +548,7 @@ struct Refine
     // read key/value at current i
     metadata_t value = mandelbrotMap.value_at(i);
 
-    CellStatus status = value.status; 
+    CellStatus status = value.status;
     
     // if value is CELL_TO_BE_REMOVED, then call erase
     // remove cell at coarse level (erase method returns true / false depending
@@ -563,7 +563,7 @@ struct Refine
   /*
    * main mandelbrot functor entry point.
    */
-  //! functor 
+  //! functor
   KOKKOS_INLINE_FUNCTION
   void operator()(const int& i) const
   {
@@ -571,7 +571,7 @@ struct Refine
     // check if we have a valid (key,value) pair at current iterator i
     if (mandelbrotMap.valid_at(i)) {
 
-      if (refine_mode == INSERT_REFINED_CELLS) { 
+      if (refine_mode == INSERT_REFINED_CELLS) {
 	insert_refined_cells(i);
       } else if (refine_mode == DELETE_OLD_CELLS) {
 	delete_old_cells(i);
@@ -758,7 +758,7 @@ void compute_mandelbrot_2d(int level_min,
   MandelbrotMap mandelbrotMap;
 
   // maximun capacity of the hash map container
-  uint64_t total_capacity = max_capacity_prefactor*N*N; 
+  uint64_t total_capacity = max_capacity_prefactor*N*N;
   
   std::cout << "Creating a metadata map with nLevels=" << level_min << " and capacity of " << total_capacity << " elements\n";
   
