@@ -1,7 +1,7 @@
 /**
  * Some usefull routines to compute / handle Morton indexes.
  *
- * Morton curve (or Z-curve) is a space filling curve, i.e. a mapping from an 
+ * Morton curve (or Z-curve) is a space filling curve, i.e. a mapping from an
  * n-dimensional space to 1d).
  */
 
@@ -15,7 +15,7 @@
  * - "Lookup table" method
  *
  * Here, we only use the "Magic bits" method.
- * 
+ *
  * Other interesting reference:
  * - libmorton, https://github.com/Forceflow/libmorton
  * - mortonlib, https://github.com/aavenel/mortonlib
@@ -45,11 +45,11 @@ template<>
 KOKKOS_INLINE_FUNCTION
 uint64_t splitBy3<1>(uint32_t a)
 {
-  
+
   uint64_t x = a;
 
   return x;
-  
+
 } // splitBy3<1>
 
 /* 2D version */
@@ -59,7 +59,7 @@ uint64_t splitBy3<2>(uint32_t a)
 {
 
   // we take all 32 bits (this is different in 3D)
-  // because the result must hold in an uint64_t ( 2x21=63 bits --> uint64_t is enought )  
+  // because the result must hold in an uint64_t ( 2x21=63 bits --> uint64_t is enought )
   uint64_t x = a & 0xffffffff;
   x = (x | x << 16) & 0xffff0000ffff;
   x = (x | x << 8) & 0xff00ff00ff00ff;
@@ -68,7 +68,7 @@ uint64_t splitBy3<2>(uint32_t a)
   x = (x | x << 1) & 0x5555555555555555;
 
   return x;
-  
+
 } // splitBy3<2>
 
 /* 3D version */
@@ -80,7 +80,7 @@ uint64_t splitBy3<3>(uint32_t a)
   // we only look at the first 21 bits
   // because the result must hold in an uint64_t ( 3x21=63 bits --> uint64_t is enought )
   uint64_t x = a & 0x1fffff;
-  
+
   x = (x | x << 32) & 0x1f00000000ffff;  // shift left 32 bits, OR with self, and 00011111000000000000000000000000000000001111111111111111
   x = (x | x << 16) & 0x1f0000ff0000ff;  // shift left 32 bits, OR with self, and 00011111000000000000000011111111000000000000000011111111
   x = (x | x << 8) & 0x100f00f00f00f00f; // shift left 32 bits, OR with self, and 0001000000001111000000001111000000001111000000001111000000000000
@@ -88,7 +88,7 @@ uint64_t splitBy3<3>(uint32_t a)
   x = (x | x << 2) & 0x1249249249249249;
 
   return x;
-    
+
 } // splitBy3<3>
 
 /**
@@ -161,9 +161,9 @@ uint64_t morton_key(const index_t<dim>& index)
   } else if (dim == 3) {
     key |= splitBy3<dim>(index[IX]) | splitBy3<dim>(index[IY]) << 1 | splitBy3<dim>(index[IZ]) << 2;
   }
-  
+
   return key;
-  
+
 } // morton_key
 
 /** another 2d version of morton key */
@@ -173,7 +173,7 @@ uint64_t morton_key(const int ix, const int iy)
   uint64_t key = 0;
   key |= splitBy3<2>(ix) | splitBy3<2>(iy) << 1;
   return key;
-  
+
 } // morton_key - 2d
 
 /** another 3d version of morton key */
@@ -183,7 +183,7 @@ uint64_t morton_key(const int ix, const int iy, const int iz)
   uint64_t key = 0;
   key |= splitBy3<3>(ix) | splitBy3<3>(iy) << 1 | splitBy3<3>(iz) << 2;
   return key;
-  
+
 } // morton_key - 3d
 
 
@@ -192,7 +192,7 @@ uint64_t morton_key(const int ix, const int iy, const int iz)
  *
  * Returned value is encoded on 32 bits.
  * In 2D, all bits can be significant.
- * In 3D, only the last 21 bits are significant, i.e. the returned value 
+ * In 3D, only the last 21 bits are significant, i.e. the returned value
  * must be lower than 2^21=2097152.
  *
  * Template parameter allows to extract either x,y or z coordinate.
@@ -205,13 +205,13 @@ uint32_t morton_extract_bits(uint64_t key)
 {
   // shift bit by dimension and thus select which coordinate to extract
   key = key >> coord;
-  
+
   if (dim==2) {
     // 5 is "0101" in binary
     // just mask bits to zero out bits at odd positions
     // so that one can extract one out of 2 bits
     key &= 0x5555555555555555;
-    
+
     key = (key ^ (key >> 1))  & 0x3333333333333333;
     key = (key ^ (key >> 2))  & 0x0f0f0f0f0f0f0f0f;
     key = (key ^ (key >> 4))  & 0x00ff00ff00ff00ff;
@@ -228,7 +228,7 @@ uint32_t morton_extract_bits(uint64_t key)
     key = (key ^ (key >> 16)) & 0x00ff00000000ffff;
     key = (key ^ (key >> 32)) & 0x1fffff;
   }
-  
+
   return static_cast<uint32_t>(key);
 
 } // morton_extract_bits

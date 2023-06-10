@@ -4,43 +4,30 @@ namespace io {
 
 // =======================================================
 // =======================================================
-FileHandlerVtk::FileHandlerVtk() :
-  FileHandler(),
-  timeStep(0),
-  isParallel(false),
-  mpiRank(0)
-{
-  
+FileHandlerVtk::FileHandlerVtk()
+    : FileHandler(), timeStep(0), isParallel(false), mpiRank(0) {
+
   suffix = "vtu";
-  
+
 } // FileHandlerVtk::FileHandlerVtk
 
 // =======================================================
 // =======================================================
-FileHandlerVtk::FileHandlerVtk(std::string directory,
-			       std::string name,
-			       std::string suffix) :
-  FileHandler(directory, name, suffix),
-  timeStep(0),
-  isParallel(false),
-  mpiRank(0)
-{
-  
-} // FileHandlerVtk::FileHandlerVtk
+FileHandlerVtk::FileHandlerVtk(std::string directory, std::string name,
+                               std::string suffix)
+    : FileHandler(directory, name, suffix), timeStep(0), isParallel(false),
+      mpiRank(0) {} // FileHandlerVtk::FileHandlerVtk
 
 // =======================================================
 // =======================================================
-FileHandlerVtk::~FileHandlerVtk()
-{
-} // FileHandlerVtk::~FileHandlerVtk
+FileHandlerVtk::~FileHandlerVtk() {} // FileHandlerVtk::~FileHandlerVtk
 
 // =======================================================
 // =======================================================
-std::string FileHandlerVtk::getFullPath()
-{
+std::string FileHandlerVtk::getFullPath() {
 
-  std::stringstream filename ;
-  
+  std::stringstream filename;
+
   if (!directory.empty())
     filename << directory << "/";
   filename << name;
@@ -52,7 +39,7 @@ std::string FileHandlerVtk::getFullPath()
   timeFormat << timeStep;
   filename << "_time";
   filename << timeFormat.str();
-  
+
   if (isParallel) {
     // write MPI rank in string rankFormat
     std::ostringstream rankFormat;
@@ -62,12 +49,11 @@ std::string FileHandlerVtk::getFullPath()
     filename << "_mpi";
     filename << rankFormat.str();
   }
-    
-  filename <<"."<< suffix ;
-  
+
+  filename << "." << suffix;
+
   return filename.str();
-  
+
 } // FileHandlerVtk::getFullPath
 
 } // namespace io
-

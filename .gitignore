@@ -4,3 +4,4 @@ compile_commands.json
 build
 build_*
 .ccls-cache
+_build/*

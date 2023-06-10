@@ -13,10 +13,10 @@ namespace io {
 // ==================================================================
 /**
  * \class FileHandler
- * \brief Create file name. 
- * 
+ * \brief Create file name.
+ *
  * Does not handle the file descriptor, only the client code can do that.
- * This class is just a simple structure, holding a few parameters 
+ * This class is just a simple structure, holding a few parameters
  * to ease building the full filename.
  *
  */
@@ -26,7 +26,7 @@ protected:
   std::string directory; /**< name of directory where file resides. */
   std::string name;      /**< name of file. */
   std::string suffix;    /**< suffix. */
-  
+
 public:
   FileHandler();
   FileHandler(std::string directory, std::string name, std::string suffix);
@@ -42,11 +42,11 @@ public:
    * specific file numbering for a time serie.
    */
   virtual std::string  getFullPath();
-  
+
   std::string getName() const      {return name; };
   std::string getDirectory() const {return directory; };
   std::string getSuffix() const    {return suffix; };
-    
+
 }; // class FileHandler
 
 } // namespace io

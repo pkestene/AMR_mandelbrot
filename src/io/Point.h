@@ -3,10 +3,11 @@
 
 #include <array>
 
-namespace {
+namespace
+{
 
 /** typedef Point holding coordinates of a point. */
-template<int dim>
+template <int dim>
 using Point = std::array<double, dim>;
 
 } // namespace

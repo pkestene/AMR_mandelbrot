@@ -42,7 +42,7 @@ enum CellStatus {
  *
  * keys[0] holds the morton index computed inside the tree the cell belongs to.
  * keys[1] holds additionnal information:
- *  - the last 8 bits encode the level (only 5 bits is required, 
+ *  - the last 8 bits encode the level (only 5 bits is required,
  *    since in 2D MAXLEVEL is 29).
  *  - the next 16 LSB encode the tree id; so only 2^16=65536 trees are allowed
  *    for now, but it should sufficient for most application
@@ -90,14 +90,14 @@ struct amr_key_t
   KOKKOS_INLINE_FUNCTION
   uint8_t get_level()
   {
-    return (keys[1] & LEVEL_MASK); 
+    return (keys[1] & LEVEL_MASK);
   } // get_level
-  
+
   /** extract treeId */
   KOKKOS_INLINE_FUNCTION
   uint16_t get_treeId()
   {
-    return (keys[1] & TREE_ID_MASK) >> 8; 
+    return (keys[1] & TREE_ID_MASK) >> 8;
   } // get_treeid
 
   KOKKOS_INLINE_FUNCTION
@@ -107,7 +107,7 @@ struct amr_key_t
     return (keys[1] < other.keys[1]) or (keys[1]==other.keys[1] and keys[0] < other.keys[0]);
 
   }
-  
+
   KOKKOS_INLINE_FUNCTION
   bool operator == (const amr_key_t& other) const
   {
@@ -115,24 +115,24 @@ struct amr_key_t
     return (keys[1] == other.keys[1]) and (keys[0]==other.keys[0]);
 
   }
-  
+
 }; // struct amr_key_t
 
 /** encode level and treeId in an uint64_t integer */
 KOKKOS_INLINE_FUNCTION
 static uint64_t encode_level_tree(int level, int treeId)
 {
-  
+
   uint64_t res = 0;
-  
+
   // first 8 bits for level
   res = (level & amr_key_t::LEVEL_MASK);
-  
+
   // then 16 bits for treeId
   res = res | ( (treeId << 8) & amr_key_t::TREE_ID_MASK);
-  
+
   return res;
-  
+
 } // encode_level_tree
 
 
@@ -141,7 +141,7 @@ static uint64_t encode_level_tree(int level, int treeId)
  *
  * keys[0] holds the morton index computed inside the tree the cell belongs to.
  * keys[1] holds additionnal information:
- *  - the last 16 least significant bits  encode the tree id; 
+ *  - the last 16 least significant bits  encode the tree id;
  *    so only 2^16=65536 trees are allowed
  *    for now, but it should sufficient for most application
  *  - the remaining bits are unused
@@ -152,16 +152,16 @@ struct morton_key_t
   static constexpr uint64_t TREE_ID_MASK = 0x000000000000FFFF;
 
   uint64_t keys[2];
-  
+
   KOKKOS_INLINE_FUNCTION
   morton_key_t() : keys{0,0} {}
-  
+
   KOKKOS_INLINE_FUNCTION
   morton_key_t(uint64_t key1, uint64_t key2) : keys{key1,key2} {}
-  
+
   KOKKOS_INLINE_FUNCTION
   uint64_t operator[](size_t i) const { return keys[i]; }
-  
+
   KOKKOS_INLINE_FUNCTION
   uint64_t& operator[](size_t i) { return keys[i]; }
 
@@ -171,28 +171,28 @@ struct morton_key_t
   {
     return keys[0];
   } // get_morton
-  
+
   /** extract treeId */
   KOKKOS_INLINE_FUNCTION
   uint16_t get_treeId()
   {
-    return (keys[1] & TREE_ID_MASK); 
+    return (keys[1] & TREE_ID_MASK);
   } // get_treeid
-  
+
 }; // struct morton_key_t
 
 /** encode treeId in an uint64_t integer */
 KOKKOS_INLINE_FUNCTION
 static uint64_t encode_tree(int treeId)
 {
-  
+
   uint64_t res = 0;
-  
+
   // 16 bits for level
   res = (treeId & morton_key_t::TREE_ID_MASK);
-  
+
   return res;
-  
+
 } // encode_tree
 
 #endif // SHARED_KEY_TYPE_H

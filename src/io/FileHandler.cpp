@@ -32,16 +32,15 @@ std::string FileHandler::getFullPath()
 {
 
   std::stringstream filename ;
-  
+
   if (!directory.empty())
     filename << directory << "/";
   filename << name;
-  
+
   filename <<"."<< suffix ;
-  
+
   return filename.str();
-  
+
 } // FileHandler::getFullPath
 
 } // namespace io
-
