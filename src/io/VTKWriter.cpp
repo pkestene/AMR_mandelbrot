@@ -221,57 +221,9 @@ VTKWriter::write_cell_data(const std::string & dataname, const std::vector<doubl
 
 // =======================================================
 // =======================================================
-void
-VTKWriter::write_cell_data(const std::string &                  dataname,
-                           const Kokkos::View<double *, Device> cell_data_d)
-{
-
-  Kokkos::View<double *, Device>::HostMirror cell_data = Kokkos::create_mirror(cell_data_d);
-
-  Kokkos::deep_copy(cell_data, cell_data_d);
-
-  const char * dataType = "Float64";
-
-  /*
-   * write cell data.
-   */
-  m_out_file << "    <DataArray type=\"" << dataType << "\" Name=\"" << dataname << "\" format=\""
-             << m_write_type_str << "\"";
-
-  if (vtk_appended_enabled())
-  {
-    m_out_file << " offset=\"" << m_offsetBytes << "\"";
-  }
-
-  m_out_file << " >\n";
-
-  m_offsetBytes += sizeof(uint64_t) + sizeof(double) * m_nbCells;
-
-  if (vtk_ascii_enabled())
-  {
-
-    for (int64_t i = 0; i < m_nbCells; ++i)
-    {
-      m_out_file << cell_data(i) << " ";
-    }
-    m_out_file << "\n";
-
-  } // end vtk_ascii_enabled
-
-  if (vtk_binary_enabled())
-  {
-
-    write_base64_binary_data(reinterpret_cast<const char *>(cell_data.data()),
-                             sizeof(double) * m_nbCells);
-
-    m_out_file << "\n";
-
-  } // end vtk_binary_enabled
-
-
-  m_out_file << "    </DataArray>\n";
-
-} // VTKWriter::write_cell_data
+// void
+// VTKWriter::write_cell_data(const std::string &                  dataname,
+//                           const Kokkos::View<double *, Device> cell_data_d)
 
 // =======================================================
 // =======================================================

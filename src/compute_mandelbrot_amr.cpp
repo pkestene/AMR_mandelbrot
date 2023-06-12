@@ -16,25 +16,21 @@
 #include <vector>
 
 #include <Kokkos_Core.hpp>
-
 #include <Kokkos_Macros.hpp> // for KOKKOS_ENABLE_XXX
-
-//#include <impl/Kokkos_Error.hpp>
-
 #include <Kokkos_UnorderedMap.hpp>
 #include <Kokkos_Sort.hpp>
 
 #include "shared/enums.h"
-
 #include "shared/morton_utils.h"
-#include "shared/amr_key.h"
+#include "shared/amr_key.h" // for CellStatus, amr_key_t
 
 // VTK IO implementation
 #include "io/Point.h"
 #include "io/VTKWriter.h" // for VTK_WRITE_ENUM class
 #include "io/IO_VTK_shared.h"
 
-enum index_status_t {
+enum index_status_t
+{
   INDEX_UNINITIALIZED = -1
 };
 
@@ -43,24 +39,28 @@ enum index_status_t {
  *
  */
 
-// physical domain extent
-static const double xmin = -2.25;
-static const double xmax =  1.25;
-static const double ymin = -1.50;
-static const double ymax =  1.50;
+/// physical domain extent
+static constexpr double xmin = -2.25;
+static constexpr double xmax = 1.25;
+static constexpr double ymin = -1.50;
+static constexpr double ymax = 1.50;
 
-static const double deltaX = xmax-xmin;
-static const double deltaY = ymax-ymin;
+static constexpr double deltaX = xmax - xmin;
+static constexpr double deltaY = ymax - ymin;
 
 /// rescale x coordinate from unit square to physical domain
 KOKKOS_INLINE_FUNCTION
-double scaleX(double x) {
+double
+scaleX(double x)
+{
   return xmin + deltaX * x;
 }
 
 /// rescale y coordinate from unit square to physical domain
 KOKKOS_INLINE_FUNCTION
-double scaleY(double y) {
+double
+scaleY(double y)
+{
   return ymin + deltaY * y;
 }
 
@@ -135,13 +135,18 @@ struct metadata_t {
 
 }; // struct metadata_t
 
-/**
- * MandelbrotMap uses key = amr_key_t (morton + tree + level), this allows
- * to have temporarily items with same location but different sizes
- * (i.e. different levels)
- * this happens e.g. while performing refine operation).
- */
-using MandelbrotMap = Kokkos::UnorderedMap<amr_key_t, metadata_t, Device>;
+template <typename ExecutionSpace> // = Kokkos::DefaultExecutionSpace
+struct MandelbrotConfig
+{
+  /**
+   * MandelbrotMap uses key = amr_key_t (morton + tree + level), this allows
+   * to have temporarily items with same location but different sizes
+   * (i.e. different levels)
+   * this happens e.g. while performing refine operation).
+   */
+  using MandelbrotMap = Kokkos::UnorderedMap<amr_key_t, metadata_t, ExecutionSpace>;
+};
+
 
 // =========================================================================
 // =========================================================================
@@ -152,25 +157,30 @@ using MandelbrotMap = Kokkos::UnorderedMap<amr_key_t, metadata_t, Device>;
  * UnorderedMap method named size().
  *
  */
-struct ComputeMapSize
+template <typename ExecutionSpace>
+struct ComputeMapSize : public MandelbrotConfig<ExecutionSpace>
 {
 
-  using execution_space = typename MandelbrotMap::execution_space;
+  using execution_space = ExecutionSpace;
+  using MandelbrotMap_t = typename ::MandelbrotConfig<ExecutionSpace>::MandelbrotMap;
+  MandelbrotMap_t mandelbrotMap;
 
-  MandelbrotMap mandelbrotMap;
-
-  ComputeMapSize( MandelbrotMap mandelbrotMap ) :
-    mandelbrotMap(mandelbrotMap)
+  ComputeMapSize(MandelbrotMap_t mandelbrotMap)
+    : mandelbrotMap(mandelbrotMap)
   {}
 
   static uint32_t
-  getSize(MandelbrotMap _mandelbrotMap)
+  getSize(MandelbrotMap_t _mandelbrotMap)
   {
     uint32_t        size = 0;
     execution_space space;
     ComputeMapSize  functor(_mandelbrotMap);
-    Kokkos::parallel_reduce(_mandelbrotMap.capacity(), functor, size);
-    execution_space().fence();
+    Kokkos::parallel_reduce(
+      "ComputeMapSize",
+      Kokkos::RangePolicy<ExecutionSpace>(space, 0, _mandelbrotMap.capacity()),
+      functor,
+      size);
+    space.fence();
     return size;
   }
 
@@ -178,7 +188,8 @@ struct ComputeMapSize
    * 2D and 3D versions.
    */
   KOKKOS_INLINE_FUNCTION
-  void operator()(const uint32_t& i, uint32_t& count) const
+  void
+  operator()(const uint32_t & i, uint32_t & count) const
   {
     if (mandelbrotMap.valid_at(i))
       ++count;
@@ -186,7 +197,11 @@ struct ComputeMapSize
   } // operator() - 2d/3d
 
   KOKKOS_INLINE_FUNCTION
-  void init( uint32_t & update ) const { update = 0 ; }
+  void
+  init(uint32_t & update) const
+  {
+    update = 0;
+  }
 
   KOKKOS_INLINE_FUNCTION
 #if KOKKOS_VERSION_MAJOR > 3
@@ -196,8 +211,11 @@ struct ComputeMapSize
     update += input;
   }
 #else
-  void join( volatile       uint32_t & update ,
-             volatile const uint32_t & input ) const { update += input ; }
+  void
+  join(volatile uint32_t & update, volatile const uint32_t & input) const
+  {
+    update += input;
+  }
 #endif
 
 }; // struct ComputeMapSize
@@ -217,21 +235,23 @@ struct ComputeMapSize
  *
  * TODO / Future version: update to take into account TreeId / connectivity.
  */
-struct FillCoarseMap
+template <typename ExecutionSpace>
+struct FillCoarseMap : public MandelbrotConfig<ExecutionSpace>
 {
 
-  MandelbrotMap mandelbrotMap;
-  int level_min, level_max;
-  int N; // linear size : 2**level_min
+  using MandelbrotMap_t = typename ::MandelbrotConfig<ExecutionSpace>::MandelbrotMap;
+  MandelbrotMap_t mandelbrotMap;
+  int             level_min, level_max;
+  int             N; // linear size : 2**level_min
 
-  FillCoarseMap( MandelbrotMap mandelbrotMap, int level_min, int level_max ) :
-    mandelbrotMap(mandelbrotMap),
-    level_min(level_min),
-    level_max(level_max),
-    N(1<<level_min)
+  FillCoarseMap(MandelbrotMap_t mandelbrotMap, int level_min, int level_max)
+    : mandelbrotMap(mandelbrotMap)
+    , level_min(level_min)
+    , level_max(level_max)
+    , N(1 << level_min)
   {
-    int size = N*N;
-    Kokkos::parallel_for(size, *this);
+    int size = N * N;
+    Kokkos::parallel_for("FillCoarseMap", Kokkos::RangePolicy<ExecutionSpace>(0, size), *this);
   }
 
   /*
@@ -284,21 +304,25 @@ struct FillCoarseMap
  * are strongly different, it means we need to refine (so new cells are
  * inserted, and parent cell is removed).
  */
-struct Refine
+template <typename ExecutionSpace>
+struct Refine : public MandelbrotConfig<ExecutionSpace>
 {
 
-  enum refine_mode_t {
+  enum refine_mode_t
+  {
     INSERT_REFINED_CELLS,
     DELETE_OLD_CELLS,
     RESET_STATUS
   };
+
+  using MandelbrotMap_t = typename ::MandelbrotConfig<ExecutionSpace>::MandelbrotMap;
 
   /**
    * a Kokkos::UnorderedMap where
    * - key is morton+treeId
    * - value is aggregate key + level
    */
-  MandelbrotMap mandelbrotMap;
+  MandelbrotMap_t mandelbrotMap;
 
   //! min and max refinment level
   int level_min, level_max;
@@ -310,14 +334,11 @@ struct Refine
   refine_mode_t refine_mode;
 
   //! constructor
-  Refine( MandelbrotMap mandelbrotMap,
-	  int level_min,
-	  int level_max,
-	  refine_mode_t refine_mode) :
-    mandelbrotMap(mandelbrotMap),
-    level_min(level_min),
-    level_max(level_max),
-    refine_mode(refine_mode)
+  Refine(MandelbrotMap_t mandelbrotMap, int level_min, int level_max, refine_mode_t refine_mode)
+    : mandelbrotMap(mandelbrotMap)
+    , level_min(level_min)
+    , level_max(level_max)
+    , refine_mode(refine_mode)
   {}
 
   /**
@@ -327,7 +348,7 @@ struct Refine
    *
    */
   static void
-  apply(MandelbrotMap _mandelbrotMap, int level_min, int level_max)
+  apply(MandelbrotMap_t _mandelbrotMap, int level_min, int level_max)
   {
 
     // step 0 : create functor
@@ -350,7 +371,9 @@ struct Refine
       functor.refine_mode = Refine::INSERT_REFINED_CELLS;
 
       // perform refinement
-      Kokkos::parallel_for(_mandelbrotMap.capacity(), functor);
+      Kokkos::parallel_for("Refine::INSER_REFINED_CELLS",
+                           Kokkos::RangePolicy<ExecutionSpace>(0, _mandelbrotMap.capacity()),
+                           functor);
 
       if (_mandelbrotMap.failed_insert())
         printf("====> Something went wrong in refinement operation (you probably need to resize up "
@@ -373,7 +396,9 @@ struct Refine
 
       // perform refinement
       functor.refine_mode = Refine::DELETE_OLD_CELLS;
-      Kokkos::parallel_for(_mandelbrotMap.capacity(), functor);
+      Kokkos::parallel_for("Refine::DELETE_OLD_CELLS",
+                           Kokkos::RangePolicy<ExecutionSpace>(0, _mandelbrotMap.capacity()),
+                           functor);
 
       // actually perform the erase operations
       _mandelbrotMap.end_erase();
@@ -387,10 +412,12 @@ struct Refine
       //
       // VERY strange mandelbrotMap.size() gives the wrong result ?! To be analyzed
       // int map_size = _mandelbrotMap.size();
-      int map_size = ComputeMapSize::getSize(_mandelbrotMap);
+      int map_size = ComputeMapSize<ExecutionSpace>::getSize(_mandelbrotMap);
       printf("[iter %d] Map size=%d (end)\n", iter, map_size);
       functor.refine_mode = Refine::RESET_STATUS;
-      Kokkos::parallel_for(_mandelbrotMap.capacity(), functor);
+      Kokkos::parallel_for("Refine::RESET_STATUS",
+                           Kokkos::RangePolicy<ExecutionSpace>(0, _mandelbrotMap.capacity()),
+                           functor);
 
       Kokkos::fence();
 
@@ -400,11 +427,12 @@ struct Refine
 
 
   KOKKOS_INLINE_FUNCTION
-  void insert_refined_cells(const int& i) const
+  void
+  insert_refined_cells(const int & i) const
   {
 
     // retrieve key,value pair
-    amr_key_t    key = mandelbrotMap.key_at(i);
+    amr_key_t  key = mandelbrotMap.key_at(i);
     metadata_t value = mandelbrotMap.value_at(i);
 
     CellStatus status = value.status;
@@ -415,118 +443,120 @@ struct Refine
      * newly inserted cells have wrong data, i.e. status is zero
      * which is exactly CELL_INVALID !?)
      */
-    if (status != CELL_UNINITIALIZED and status != CELL_INVALID) {
+    if (status != CELL_UNINITIALIZED and status != CELL_INVALID)
+    {
 
-      uint8_t  level  = key.get_level();
+      uint8_t  level = key.get_level();
       uint16_t treeId = key.get_treeId();
 
       uint64_t morton = key.get_morton();
 
       // decode morton index
       // ix and iy should lie in [0, 2**level_max-1]
-      uint32_t ix = morton_extract_bits<2,IX>(morton);
-      uint32_t iy = morton_extract_bits<2,IY>(morton);
+      uint32_t ix = morton_extract_bits<2, IX>(morton);
+      uint32_t iy = morton_extract_bits<2, IY>(morton);
 
-      int N = 1<<level;
-      double dx = 1.0/N;
-      double dy = 1.0/N;
+      int    N = 1 << level;
+      double dx = 1.0 / N;
+      double dy = 1.0 / N;
 
       // compute cell-center x,y coordinates in real space [0,1]^2
-      double xc = (ix+0.5)*dx;
-      double yc = (iy+0.5)*dy;
-      double x = scaleX( xc );
-      double y = scaleY( yc );
+      double xc = (ix + 0.5) * dx;
+      double yc = (iy + 0.5) * dy;
+      double x = scaleX(xc);
+      double y = scaleY(yc);
 
       // determine if refinement is needed
       // compute nb iter at cell center
-      double datac = compute_nb_iters(x,y);
+      double datac = compute_nb_iters(x, y);
 
       // compute nb iter at sub-cell centers
-      double data[4], average=0.0;
-      for (int index=0; index<4; ++index) {
+      double data[4], average = 0.0;
+      for (int index = 0; index < 4; ++index)
+      {
 
-	int di = 2*(  index     & 0x1 )-1;
-	int dj = 2*( (index>>1) & 0x1 )-1;
-	x = scaleX( xc + di*0.25*dx );
-	y = scaleY( yc + dj*0.25*dy );
-	data[index] = compute_nb_iters(x,y);
-	average += data[index];
+        int di = 2 * (index & 0x1) - 1;
+        int dj = 2 * ((index >> 1) & 0x1) - 1;
+        x = scaleX(xc + di * 0.25 * dx);
+        y = scaleY(yc + dj * 0.25 * dy);
+        data[index] = compute_nb_iters(x, y);
+        average += data[index];
       }
       average /= 4;
 
       bool refinement_needed = false;
-      if ( datac / average > 1+epsilon or
-	   datac / average < 1-epsilon )
-	refinement_needed = true;
+      if (datac / average > 1 + epsilon or datac / average < 1 - epsilon)
+        refinement_needed = true;
 
-      if ( refinement_needed ) {
-	// refinement is need
-	// create/insert new cells at fine level with metadata
+      if (refinement_needed)
+      {
+        // refinement is need
+        // create/insert new cells at fine level with metadata
 
-	// build the new child (keys, values) and insert
+        // build the new child (keys, values) and insert
 
-	// if(level==5)
-	//   printf("HOUSTON %d %d %ld -- %ld %d %d\n",i,value.status,value.index,
-	// 	 value.key[0],
-	// 	 morton_extract_bits<dim,IX>(value.key[0]),
-	// 	 morton_extract_bits<dim,IY>(value.key[0]) );
+        // if(level==5)
+        //   printf("HOUSTON %d %d %ld -- %ld %d %d\n",i,value.status,value.index,
+        // 	 value.key[0],
+        // 	 morton_extract_bits<dim,IX>(value.key[0]),
+        // 	 morton_extract_bits<dim,IY>(value.key[0]) );
 
-	{
-	  int ixx = ix<<1;
-	  int iyy = iy<<1;
-	  amr_key_t ckey(morton_key(ixx,iyy), encode_level_tree(level+1,treeId));
+        {
+          int       ixx = ix << 1;
+          int       iyy = iy << 1;
+          amr_key_t ckey(morton_key(ixx, iyy), encode_level_tree(level + 1, treeId));
 
-	  int mx = ixx << (level_max-level-1);
-	  int my = iyy << (level_max-level-1);
-	  morton_key_t mkey(morton_key(mx,my),encode_tree(treeId));
+          int          mx = ixx << (level_max - level - 1);
+          int          my = iyy << (level_max - level - 1);
+          morton_key_t mkey(morton_key(mx, my), encode_tree(treeId));
 
-	  metadata_t child_value(mkey, INDEX_UNINITIALIZED, data[0], CELL_UNINITIALIZED);
-	  mandelbrotMap.insert(ckey, child_value);
-	}
+          metadata_t child_value(mkey, INDEX_UNINITIALIZED, data[0], CELL_UNINITIALIZED);
+          mandelbrotMap.insert(ckey, child_value);
+        }
 
-	{
-	  int ixx = ix<<1 | 0x1;
-	  int iyy = iy<<1;
-	  amr_key_t ckey(morton_key(ixx,iyy), encode_level_tree(level+1,treeId));
+        {
+          int       ixx = ix << 1 | 0x1;
+          int       iyy = iy << 1;
+          amr_key_t ckey(morton_key(ixx, iyy), encode_level_tree(level + 1, treeId));
 
-	  int mx = ixx << (level_max-level-1);
-	  int my = iyy << (level_max-level-1);
-	  morton_key_t mkey(morton_key(mx,my),encode_tree(treeId));
+          int          mx = ixx << (level_max - level - 1);
+          int          my = iyy << (level_max - level - 1);
+          morton_key_t mkey(morton_key(mx, my), encode_tree(treeId));
 
-	  metadata_t child_value(mkey, INDEX_UNINITIALIZED, data[1], CELL_UNINITIALIZED);
-	  mandelbrotMap.insert(ckey, child_value);
-	}
+          metadata_t child_value(mkey, INDEX_UNINITIALIZED, data[1], CELL_UNINITIALIZED);
+          mandelbrotMap.insert(ckey, child_value);
+        }
 
-	{
-	  int ixx = ix<<1;
-	  int iyy = iy<<1 | 0x1;
-	  amr_key_t ckey(morton_key(ixx,iyy), encode_level_tree(level+1,treeId));
+        {
+          int       ixx = ix << 1;
+          int       iyy = iy << 1 | 0x1;
+          amr_key_t ckey(morton_key(ixx, iyy), encode_level_tree(level + 1, treeId));
 
-	  int mx = ixx << (level_max-level-1);
-	  int my = iyy << (level_max-level-1);
-	  morton_key_t mkey(morton_key(mx,my),encode_tree(treeId));
+          int          mx = ixx << (level_max - level - 1);
+          int          my = iyy << (level_max - level - 1);
+          morton_key_t mkey(morton_key(mx, my), encode_tree(treeId));
 
-	  metadata_t child_value(mkey, INDEX_UNINITIALIZED, data[2], CELL_UNINITIALIZED);
-	  mandelbrotMap.insert(ckey, child_value);
-	}
+          metadata_t child_value(mkey, INDEX_UNINITIALIZED, data[2], CELL_UNINITIALIZED);
+          mandelbrotMap.insert(ckey, child_value);
+        }
 
-	{
-	  int ixx = ix<<1 | 0x1;
-	  int iyy = iy<<1 | 0x1;
-	  amr_key_t ckey(morton_key(ixx,iyy), encode_level_tree(level+1,treeId));
+        {
+          int       ixx = ix << 1 | 0x1;
+          int       iyy = iy << 1 | 0x1;
+          amr_key_t ckey(morton_key(ixx, iyy), encode_level_tree(level + 1, treeId));
 
-	  int mx = ixx << (level_max-level-1);
-	  int my = iyy << (level_max-level-1);
-	  morton_key_t mkey(morton_key(mx,my),encode_tree(treeId));
+          int          mx = ixx << (level_max - level - 1);
+          int          my = iyy << (level_max - level - 1);
+          morton_key_t mkey(morton_key(mx, my), encode_tree(treeId));
 
-	  metadata_t child_value(mkey, INDEX_UNINITIALIZED, data[3], CELL_UNINITIALIZED);
-	  mandelbrotMap.insert(ckey, child_value);
-	}
+          metadata_t child_value(mkey, INDEX_UNINITIALIZED, data[3], CELL_UNINITIALIZED);
+          mandelbrotMap.insert(ckey, child_value);
+        }
 
 
-	// mark coarse cell for removal
-	value.status = CELL_TO_BE_REMOVED;
-	mandelbrotMap.value_at(i) = value;
+        // mark coarse cell for removal
+        value.status = CELL_TO_BE_REMOVED;
+        mandelbrotMap.value_at(i) = value;
 
       } // end if refinement needed
 
@@ -581,18 +611,25 @@ struct Refine
    */
   //! functor
   KOKKOS_INLINE_FUNCTION
-  void operator()(const int& i) const
+  void
+  operator()(const int & i) const
   {
 
     // check if we have a valid (key,value) pair at current iterator i
-    if (mandelbrotMap.valid_at(i)) {
+    if (mandelbrotMap.valid_at(i))
+    {
 
-      if (refine_mode == INSERT_REFINED_CELLS) {
-	insert_refined_cells(i);
-      } else if (refine_mode == DELETE_OLD_CELLS) {
-	delete_old_cells(i);
-      } else if (refine_mode == RESET_STATUS) {
-	reset_status(i);
+      if (refine_mode == INSERT_REFINED_CELLS)
+      {
+        insert_refined_cells(i);
+      }
+      else if (refine_mode == DELETE_OLD_CELLS)
+      {
+        delete_old_cells(i);
+      }
+      else if (refine_mode == RESET_STATUS)
+      {
+        reset_status(i);
       }
 
     } // end valid_at
@@ -608,269 +645,293 @@ struct Refine
  *
  * file format is vtk unstructured grid.
  */
-void
-dump_vtk_2d(const std::string & filename, MandelbrotMap mandelbrotMap)
+template <typename ExecutionSpace>
+struct VtkWriter : public MandelbrotConfig<ExecutionSpace>
 {
 
-  std::cout << "dump vtk 2d\n";
-  std::cout << "mandelbrotMap.size()=" << mandelbrotMap.size() << "\n";
+  using MandelbrotMap_t = typename ::MandelbrotConfig<ExecutionSpace>::MandelbrotMap;
 
-  int nbNodesPerCells = 4; // 2d
-
-  // compute total number of cells
-  uint64_t nbCells = mandelbrotMap.size();
-
-  // compute total number of vertices
-  uint64_t nbNodes = nbCells * nbNodesPerCells;
-
-  // allocate a 2d device View of size : number of nodes by 3
-  // (x,y,z) of a given node
-  using Nodes_pos = Kokkos::View<double * [3], Device>;
-  using Nodes_pos_host = Nodes_pos::HostMirror;
-
-  Nodes_pos nodes_pos = Nodes_pos("nodes_position", nbNodes);
-
-  // convert nodes_pos to a std::vector (we will need to improve / avoid this later)
-  std::vector<::Point<3>> nodes_coord(nbNodes);
-
-  // Kokkos view of keys
-  using KeyVec = Kokkos::View<amr_key_t *, Device>;
-  // using KeyVec_h = Kokkos::View<amr_key_t*, Device>::HostMirror;
-
-  KeyVec keyVec = KeyVec("vector_of_keys", mandelbrotMap.size());
-
-  using CellData = Kokkos::View<double *, Device>;
-
-  CellData data_levels = CellData("data_levels", mandelbrotMap.size());
-  CellData data_mkeys = CellData("data_mkeys", mandelbrotMap.size());
-  CellData data_mindex = CellData("data_mindex", mandelbrotMap.size());
-  CellData data_mandelbrot = CellData("data_mandelbrot", mandelbrotMap.size());
-
-  // create a vector of keys + some example cell data
-  Kokkos::parallel_scan(
-    "copy_kokkos_unordered_map_to_view",
-    mandelbrotMap.capacity(),
-    KOKKOS_LAMBDA(const int & i, int & ivec, const bool final) {
-      if (mandelbrotMap.valid_at(i))
-      {
-        if (final)
-        {
-          amr_key_t  key = mandelbrotMap.key_at(i);
-          metadata_t value = mandelbrotMap.value_at(i);
-          keyVec(ivec) = key;
-          data_levels(ivec) = 1.0 * key.get_level();
-          data_mkeys(ivec) = 1.0 * value.key[0];
-          data_mindex(ivec) = 1.0 * value.index;
-          data_mandelbrot(ivec) = value.data;
-        }
-
-        ivec++;
-      }
-    });
-
-  printf("keyVec size is %ld\n", keyVec.size());
-
-  // get nodes position
-  Kokkos::parallel_for(
-    "get nodes positions", keyVec.extent(0), KOKKOS_LAMBDA(const int & i) {
-      amr_key_t key = keyVec(i);
-      uint64_t  morton = key.get_morton();
-      uint32_t  ix = morton_extract_bits<2, IX>(morton);
-      uint32_t  iy = morton_extract_bits<2, IY>(morton);
-
-      int level = key.get_level();
-      int N = 1 << level;
-
-      double dx = 1.0 / N;
-      double dy = 1.0 / N;
-
-      int64_t ii = i;
-      nodes_pos(ii * nbNodesPerCells + 0, IX) = ix * dx;
-      nodes_pos(ii * nbNodesPerCells + 0, IY) = iy * dy;
-      nodes_pos(ii * nbNodesPerCells + 0, IZ) = 0.0;
-
-      nodes_pos(ii * nbNodesPerCells + 1, IX) = ix * dx + dx;
-      nodes_pos(ii * nbNodesPerCells + 1, IY) = iy * dy;
-      nodes_pos(ii * nbNodesPerCells + 1, IZ) = 0.0;
-
-      nodes_pos(ii * nbNodesPerCells + 2, IX) = ix * dx + dx;
-      nodes_pos(ii * nbNodesPerCells + 2, IY) = iy * dy + dy;
-      nodes_pos(ii * nbNodesPerCells + 2, IZ) = 0.0;
-
-      nodes_pos(ii * nbNodesPerCells + 3, IX) = ix * dx;
-      nodes_pos(ii * nbNodesPerCells + 3, IY) = iy * dy + dy;
-      nodes_pos(ii * nbNodesPerCells + 3, IZ) = 0.0;
-    });
-
-  // convert nodes_pos to nodes_coord (On host with OpenMP)
+  static void
+  dump(const std::string & filename, MandelbrotMap_t mandelbrotMap)
   {
-    Nodes_pos_host nodes_pos_host = Kokkos::create_mirror(nodes_pos);
 
-    Kokkos::deep_copy(nodes_pos_host, nodes_pos);
+    std::cout << "dump vtk 2d\n";
+    std::cout << "mandelbrotMap.size()=" << mandelbrotMap.size() << "\n";
 
-    Kokkos::parallel_for(Kokkos::RangePolicy<Kokkos::OpenMP>(0, nbNodes), [&](const int i) {
-      nodes_coord[i] = { nodes_pos_host(i, IX), nodes_pos_host(i, IY), nodes_pos_host(i, IZ) };
-    });
-  }
+    int nbNodesPerCells = 4; // 2d
 
-  io::VTKWriter vtkWriter(nbCells);
-  vtkWriter.open_file();
-  vtkWriter.write_header();
-  vtkWriter.write_metadata(0, 0.0);
-  vtkWriter.write_piece_header(nbNodes);
+    // compute total number of cells
+    uint64_t nbCells = mandelbrotMap.size();
 
-  vtkWriter.write_geometry<2>(nodes_coord);
-  vtkWriter.write_connectivity<2>();
+    // compute total number of vertices
+    uint64_t nbNodes = nbCells * nbNodesPerCells;
 
-  vtkWriter.open_data();
-  // write cell data - meta + heavy
-  // vtkWriter.write_cell_data("level", cell_levels);
-  vtkWriter.write_cell_data("level", data_levels);
-  vtkWriter.write_cell_data("morton_index", data_mkeys);
-  vtkWriter.write_cell_data("memory_index", data_mindex);
-  vtkWriter.write_cell_data("mandelbrot", data_mandelbrot);
+    // allocate a 2d device View of size : number of nodes by 3
+    // (x,y,z) of a given node
+    using Nodes_pos = Kokkos::View<double * [3], ExecutionSpace>;
+    using Nodes_pos_host = typename Nodes_pos::HostMirror;
 
-  vtkWriter.close_data();
+    Nodes_pos nodes_pos = Nodes_pos("nodes_position", nbNodes);
 
-  // finaly closing the file !
-  vtkWriter.write_piece_footer();
-  vtkWriter.close_grid();
-  vtkWriter.write_footer();
-  vtkWriter.close_file();
+    // convert nodes_pos to a std::vector (we will need to improve / avoid this later)
+    std::vector<::Point<3>> nodes_coord(nbNodes);
 
-} // dump_vtk_2d
+    // Kokkos view of keys
+    using KeyVec = Kokkos::View<amr_key_t *, ExecutionSpace>;
+    // using KeyVec_h = Kokkos::View<amr_key_t*, ExecutionSpace>::HostMirror;
+
+    KeyVec keyVec = KeyVec("vector_of_keys", mandelbrotMap.size());
+
+    using CellData = Kokkos::View<double *, ExecutionSpace>;
+
+    CellData data_levels = CellData("data_levels", mandelbrotMap.size());
+    CellData data_mkeys = CellData("data_mkeys", mandelbrotMap.size());
+    CellData data_mindex = CellData("data_mindex", mandelbrotMap.size());
+    CellData data_mandelbrot = CellData("data_mandelbrot", mandelbrotMap.size());
+
+    // create a vector of keys + some example cell data
+    Kokkos::parallel_scan(
+      "copy_kokkos_unordered_map_to_view",
+      Kokkos::RangePolicy<ExecutionSpace>(0, mandelbrotMap.capacity()),
+      KOKKOS_LAMBDA(const int & i, int & ivec, const bool final) {
+        if (mandelbrotMap.valid_at(i))
+        {
+          if (final)
+          {
+            amr_key_t  key = mandelbrotMap.key_at(i);
+            metadata_t value = mandelbrotMap.value_at(i);
+            keyVec(ivec) = key;
+            data_levels(ivec) = 1.0 * key.get_level();
+            data_mkeys(ivec) = 1.0 * value.key[0];
+            data_mindex(ivec) = 1.0 * value.index;
+            data_mandelbrot(ivec) = value.data;
+          }
+
+          ivec++;
+        }
+      });
+
+    printf("keyVec size is %ld\n", keyVec.size());
+
+    // get nodes position
+    Kokkos::parallel_for(
+      "get nodes positions",
+      Kokkos::RangePolicy<ExecutionSpace>(0, keyVec.extent(0)),
+      KOKKOS_LAMBDA(const int & i) {
+        amr_key_t key = keyVec(i);
+        uint64_t  morton = key.get_morton();
+        uint32_t  ix = morton_extract_bits<2, IX>(morton);
+        uint32_t  iy = morton_extract_bits<2, IY>(morton);
+
+        int level = key.get_level();
+        int N = 1 << level;
+
+        double dx = 1.0 / N;
+        double dy = 1.0 / N;
+
+        int64_t ii = i;
+        nodes_pos(ii * nbNodesPerCells + 0, IX) = ix * dx;
+        nodes_pos(ii * nbNodesPerCells + 0, IY) = iy * dy;
+        nodes_pos(ii * nbNodesPerCells + 0, IZ) = 0.0;
+
+        nodes_pos(ii * nbNodesPerCells + 1, IX) = ix * dx + dx;
+        nodes_pos(ii * nbNodesPerCells + 1, IY) = iy * dy;
+        nodes_pos(ii * nbNodesPerCells + 1, IZ) = 0.0;
+
+        nodes_pos(ii * nbNodesPerCells + 2, IX) = ix * dx + dx;
+        nodes_pos(ii * nbNodesPerCells + 2, IY) = iy * dy + dy;
+        nodes_pos(ii * nbNodesPerCells + 2, IZ) = 0.0;
+
+        nodes_pos(ii * nbNodesPerCells + 3, IX) = ix * dx;
+        nodes_pos(ii * nbNodesPerCells + 3, IY) = iy * dy + dy;
+        nodes_pos(ii * nbNodesPerCells + 3, IZ) = 0.0;
+      });
+
+    // convert nodes_pos to nodes_coord (On host with OpenMP)
+    {
+      Nodes_pos_host nodes_pos_host = Kokkos::create_mirror(nodes_pos);
+
+      Kokkos::deep_copy(nodes_pos_host, nodes_pos);
+
+      Kokkos::parallel_for(
+        "Copy node positions data",
+        Kokkos::RangePolicy<Kokkos::OpenMP>(0, nbNodes),
+        [&](const int i) {
+          nodes_coord[i] = { nodes_pos_host(i, IX), nodes_pos_host(i, IY), nodes_pos_host(i, IZ) };
+        });
+    }
+
+    io::VTKWriter vtkWriter(nbCells);
+    vtkWriter.open_file();
+    vtkWriter.write_header();
+    vtkWriter.write_metadata(0, 0.0);
+    vtkWriter.write_piece_header(nbNodes);
+
+    vtkWriter.write_geometry<2>(nodes_coord);
+    vtkWriter.write_connectivity<2>();
+
+    vtkWriter.open_data();
+    // write cell data - meta + heavy
+    // vtkWriter.write_cell_data("level", cell_levels);
+    vtkWriter.write_cell_data("level", data_levels);
+    vtkWriter.write_cell_data("morton_index", data_mkeys);
+    vtkWriter.write_cell_data("memory_index", data_mindex);
+    vtkWriter.write_cell_data("mandelbrot", data_mandelbrot);
+
+    vtkWriter.close_data();
+
+    // finaly closing the file !
+    vtkWriter.write_piece_footer();
+    vtkWriter.close_grid();
+    vtkWriter.write_footer();
+    vtkWriter.close_file();
+
+  } // dump
+
+}; // struct VtkWriter
 
 // =========================================================================
 // =========================================================================
 /**
  * Driver function for Mandelbrot set computation.
- *
  */
-void
-compute_mandelbrot_2d(int level_min, int level_max, int max_capacity_prefactor)
+template <typename ExecutionSpace>
+struct MandelbrotCompute : public MandelbrotConfig<ExecutionSpace>
 {
+  using MandelbrotMap_t = typename ::MandelbrotConfig<ExecutionSpace>::MandelbrotMap;
 
-  std::cout << "=================================\n";
-  std::cout << "===== compute Mandelbrot Set ====\n";
-  std::cout << "=================================\n";
+  static void
+  run(int level_min, int level_max, int max_capacity_prefactor)
+  {
 
-  std::cout << "Level min = " << level_min << "\n";
-  std::cout << "Level max = " << level_max << "\n";
+    {
+      ExecutionSpace space;
+      std::cout << "===============================================\n";
+      std::cout << "===== Compute Mandelbrot Set using " << space.name() << "\n";
+      std::cout << "===============================================\n";
+    }
 
-  // linear size along a direction
-  int N = 1 << level_min;
+    std::cout << "Level min = " << level_min << "\n";
+    std::cout << "Level max = " << level_max << "\n";
 
-  // an unordered map with metadata
-  MandelbrotMap mandelbrotMap;
+    // linear size along a direction
+    int N = 1 << level_min;
 
-  // maximun capacity of the hash map container
-  uint64_t total_capacity = max_capacity_prefactor * N * N;
+    // an unordered map with metadata
+    MandelbrotMap_t mandelbrotMap;
 
-  std::cout << "Creating a metadata map with nLevels=" << level_min << " and capacity of "
-            << total_capacity << " elements\n";
+    // maximun capacity of the hash map container
+    uint64_t total_capacity = max_capacity_prefactor * N * N;
 
-  // allocate some space in the hash map
-  mandelbrotMap.rehash(total_capacity);
+    std::cout << "Creating a metadata map with nLevels=" << level_min << " and capacity of "
+              << total_capacity << " elements\n";
 
-  // play with Kokkos API for UnorderedMap
-  std::cout << "is mandelbrotMap insertable ? " << mandelbrotMap.is_insertable_map << "\n";
-  std::cout << "is mandelbrotMap modifiable ? " << mandelbrotMap.is_modifiable_map << "\n";
+    // allocate some space in the hash map
+    mandelbrotMap.rehash(total_capacity);
 
-  std::cout << "mandelbrotMap.size()     = " << mandelbrotMap.size() << std::endl;
-  std::cout << "mandelbrotMap.capacity() = " << mandelbrotMap.capacity() << " (max size)"
-            << std::endl;
+    // play with Kokkos API for UnorderedMap
+    std::cout << "is mandelbrotMap insertable ? " << mandelbrotMap.is_insertable_map << "\n";
+    std::cout << "is mandelbrotMap modifiable ? " << mandelbrotMap.is_modifiable_map << "\n";
 
-  // just initialize mandelbrotMap with a coarse uniform grid
-  FillCoarseMap fill(mandelbrotMap, level_min, level_max);
+    std::cout << "mandelbrotMap.size()     = " << mandelbrotMap.size() << std::endl;
+    std::cout << "mandelbrotMap.capacity() = " << mandelbrotMap.capacity() << " (max size)"
+              << std::endl;
 
-  std::cout << "[before refine] number of cells in mandelbrotMap " << mandelbrotMap.size() << " "
-            << "\n";
+    // just initialize mandelbrotMap with a coarse uniform grid
+    FillCoarseMap<ExecutionSpace> fill(mandelbrotMap, level_min, level_max);
 
-  // refine nbIter times
-  Refine::apply(mandelbrotMap, level_min, level_max);
-  Kokkos::fence();
-  std::cout << "[after  refine] number of cells in mandelbrotMap " << mandelbrotMap.size() << " "
-            << "\n";
+    std::cout << "[before refine] number of cells in mandelbrotMap " << mandelbrotMap.size() << " "
+              << "\n";
 
-  uint64_t Nsquare = 1 << 2 * level_max;
-  std::cout << "Sparsity of Mandelbrot set : " << 100.0 * mandelbrotMap.size() / Nsquare << "%\n";
+    // refine nbIter times
+    Refine<ExecutionSpace>::apply(mandelbrotMap, level_min, level_max);
+    Kokkos::fence();
+    std::cout << "[after  refine] number of cells in mandelbrotMap " << mandelbrotMap.size() << " "
+              << "\n";
 
-  // create array (Kokkos::View) of keys
-  using KeyVec = Kokkos::View<amr_key_t *, Device>;
+    uint64_t Nsquare = 1 << 2 * level_max;
+    std::cout << "Sparsity of Mandelbrot set : " << 100.0 * mandelbrotMap.size() / Nsquare << "%\n";
 
-  // create array of morton key (TODO replace uint64_t by morton_key_t)
-  using KeyVec2 = Kokkos::View<uint64_t *, Device>;
-  // using KeyVec_h = Kokkos::View<amr_key_t*, Device>::HostMirror;
+    // create array (Kokkos::View) of keys
+    using KeyVec = Kokkos::View<amr_key_t *, ExecutionSpace>;
 
-  KeyVec  keyVec = KeyVec("keys", mandelbrotMap.size());
-  KeyVec2 sorted_keyVec = KeyVec2("sorted_keys", mandelbrotMap.size());
+    // create array of morton key (TODO replace uint64_t by morton_key_t)
+    using KeyVec2 = Kokkos::View<uint64_t *, ExecutionSpace>;
+    // using KeyVec_h = Kokkos::View<amr_key_t*, ExecutionSpace>::HostMirror;
 
-  using Morton2AMR = Kokkos::UnorderedMap<uint64_t, amr_key_t, Device>;
-  Morton2AMR morton2amr;
-  morton2amr.rehash(mandelbrotMap.capacity());
+    KeyVec  keyVec = KeyVec("keys", mandelbrotMap.size());
+    KeyVec2 sorted_keyVec = KeyVec2("sorted_keys", mandelbrotMap.size());
 
-  // fill keyVec, init sorted_keyVec and morton2amr
-  Kokkos::parallel_scan(
-    "copy_kokkos_unordered_map_to_view",
-    mandelbrotMap.capacity(),
-    KOKKOS_LAMBDA(const int & i, int & ivec, const bool final) {
-      if (mandelbrotMap.valid_at(i))
-      {
-        if (final)
+    using Morton2AMR = Kokkos::UnorderedMap<uint64_t, amr_key_t, ExecutionSpace>;
+    Morton2AMR morton2amr;
+    morton2amr.rehash(mandelbrotMap.capacity());
+
+    // fill keyVec, init sorted_keyVec and morton2amr
+    Kokkos::parallel_scan(
+      "copy_kokkos_unordered_map_to_view",
+      Kokkos::RangePolicy<ExecutionSpace>(0, mandelbrotMap.capacity()),
+      KOKKOS_LAMBDA(const int & i, int & ivec, const bool final) {
+        if (mandelbrotMap.valid_at(i))
         {
-          keyVec(ivec) = mandelbrotMap.key_at(i);
-          metadata_t value = mandelbrotMap.value_at(i);
+          if (final)
+          {
+            keyVec(ivec) = mandelbrotMap.key_at(i);
+            metadata_t value = mandelbrotMap.value_at(i);
 
-          uint64_t mkey = value.key[0];
-          sorted_keyVec(ivec) = mkey;
-          morton2amr.insert(mkey, mandelbrotMap.key_at(i));
+            uint64_t mkey = value.key[0];
+            sorted_keyVec(ivec) = mkey;
+            morton2amr.insert(mkey, mandelbrotMap.key_at(i));
+          }
+
+          ivec++;
         }
+      });
 
-        ivec++;
-      }
-    });
+    printf("keyVec size is %ld\n", keyVec.size());
 
-  printf("keyVec size is %ld\n", keyVec.size());
+    // for(size_t i=0; i<keyVec.size(); ++i)
+    //   printf("%ld %ld \n",i,keyVec(i)[0]);
 
-  // for(size_t i=0; i<keyVec.size(); ++i)
-  //   printf("%ld %ld \n",i,keyVec(i)[0]);
+    // sort KeyVec
+    // Kokkos::sort(keyVec);
+    Kokkos::sort(sorted_keyVec);
 
-  // sort KeyVec
-  // Kokkos::sort(keyVec);
-  Kokkos::sort(sorted_keyVec);
+    // not really sure there should be a fence here; without it data_levels
+    // are not correct (to be analyzed, why exactly is it so)
+    Kokkos::fence();
 
-  // not really sure there should be a fence here; without it data_levels
-  // are not correct (to be analyzed, why exactly is it so)
-  Kokkos::fence();
+    // for(size_t i=0; i<keyVec.size(); ++i)
+    //   printf("%ld %ld \n",i,keyVec2(i));
 
-  // for(size_t i=0; i<keyVec.size(); ++i)
-  //   printf("%ld %ld \n",i,keyVec2(i));
+    // fill index in metadata hashmap
+    Kokkos::parallel_for(
+      "fill_indexed_in_metadata",
+      Kokkos::RangePolicy<ExecutionSpace>(0, sorted_keyVec.size()),
+      KOKKOS_LAMBDA(const int & i) {
+        // read morton key along Z-curve
+        uint64_t mkey = sorted_keyVec(i);
 
-  // fill index in metadata hashmap
-  Kokkos::parallel_for(
-    "fill_indexed_in_metadata", sorted_keyVec.size(), KOKKOS_LAMBDA(const int & i) {
-      // read morton key along Z-curve
-      uint64_t mkey = sorted_keyVec(i);
+        // find corresponding amr key by hash table loopkup
+        size_t    ikey = morton2amr.find(mkey);
+        amr_key_t amr_key = morton2amr.value_at(ikey);
 
-      // find corresponding amr key by hash table loopkup
-      size_t    ikey = morton2amr.find(mkey);
-      amr_key_t amr_key = morton2amr.value_at(ikey);
+        // insert index into metadata
+        ikey = mandelbrotMap.find(amr_key);
 
-      // insert index into metadata
-      ikey = mandelbrotMap.find(amr_key);
+        // ikey should always be here
+        metadata_t value = mandelbrotMap.value_at(ikey);
 
-      // ikey should always be here
-      metadata_t value = mandelbrotMap.value_at(ikey);
+        value.index = i;
 
-      value.index = i;
+        mandelbrotMap.value_at(ikey) = value;
+      });
 
-      mandelbrotMap.value_at(ikey) = value;
-    });
+    // dump in vtk file format
+    VtkWriter<ExecutionSpace>::dump("mandelbrot_set_2d.vtk", mandelbrotMap);
 
-  // dump in vtk file format
-  dump_vtk_2d("mandelbrot_set_2d.vtk", mandelbrotMap);
+  } // run
 
-} // compute_mandelbrot_2d
+}; // struct MandelbrotCompute
 
 } // namespace
 
@@ -878,12 +939,13 @@ compute_mandelbrot_2d(int level_min, int level_max, int max_capacity_prefactor)
 // =========================================================================
 // =========================================================================
 // =========================================================================
-int main(int argc, char* argv[])
+int
+main(int argc, char * argv[])
 {
 
   // Create MPI session if MPI enabled
 #ifdef USE_MPI
-  hydroSimu::GlobalMpiSession mpiSession(&argc,&argv);
+  hydroSimu::GlobalMpiSession mpiSession(&argc, &argv);
 #endif // USE_MPI
 
   Kokkos::initialize(argc, argv);
@@ -895,14 +957,13 @@ int main(int argc, char* argv[])
 
     std::ostringstream msg;
     std::cout << "Kokkos configuration" << std::endl;
-    if ( Kokkos::hwloc::available() ) {
-      msg << "hwloc( NUMA[" << Kokkos::hwloc::get_available_numa_count()
-          << "] x CORE["    << Kokkos::hwloc::get_available_cores_per_numa()
-          << "] x HT["      << Kokkos::hwloc::get_available_threads_per_core()
-          << "] )"
-          << std::endl ;
+    if (Kokkos::hwloc::available())
+    {
+      msg << "hwloc( NUMA[" << Kokkos::hwloc::get_available_numa_count() << "] x CORE["
+          << Kokkos::hwloc::get_available_cores_per_numa() << "] x HT["
+          << Kokkos::hwloc::get_available_threads_per_core() << "] )" << std::endl;
     }
-    Kokkos::print_configuration( msg );
+    Kokkos::print_configuration(msg);
 
     std::cout << msg.str();
     std::cout << "##########################\n";
@@ -915,12 +976,15 @@ int main(int argc, char* argv[])
   // - level_max
   // - max_capacity_prefactor : used to preallocated the hash table
   //   hash table size is coarse grid size x max_capacity_prefactor
-  const int level_min = argc>1 ? std::atoi(argv[1]) : 6;
-  const int level_max = argc>2 ? std::atoi(argv[2]) : 10;
-  const int max_capacity_prefactor = argc>3 ?
-    std::atoi(argv[3]) : 500;
+  const int level_min = argc > 1 ? std::atoi(argv[1]) : 6;
+  const int level_max = argc > 2 ? std::atoi(argv[2]) : 10;
+  const int max_capacity_prefactor = argc > 3 ? std::atoi(argv[3]) : 500;
 
-  ::compute_mandelbrot_2d(level_min,level_max,max_capacity_prefactor);
+  MandelbrotCompute<Kokkos::DefaultExecutionSpace>::run(
+    level_min, level_max, max_capacity_prefactor);
+
+  // MandelbrotCompute<Kokkos::Cuda>::run(level_min, level_max, max_capacity_prefactor);
+  // MandelbrotCompute<Kokkos::OpenMP>::run(level_min, level_max, max_capacity_prefactor);
 
   Kokkos::finalize();
 
