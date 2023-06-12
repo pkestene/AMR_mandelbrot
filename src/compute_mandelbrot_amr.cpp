@@ -75,39 +75,42 @@ static constexpr double epsilon = 0.01;
  */
 KOKKOS_INLINE_FUNCTION
 double
-compute_nb_iters (double cx, double cy)
+compute_nb_iters(double cx, double cy)
 {
   // maximum number of iterations
-  constexpr int NMAX=512;
+  constexpr int NMAX = 512;
 
   // init number of iterations
   int j = 0;
 
-  double norm = (cx*cx + cy*cy);
+  double norm = (cx * cx + cy * cy);
   double zx = cx;
   double zy = cy;
   double tmp;
 
-  while (j <= NMAX and norm < 4) {
-    tmp  = (zx*zx) - (zy*zy) + cx; // Real part
-    zy   = (2.*zx*zy) + cy;        // Imag part
-    zx   = tmp;
+  while (j <= NMAX and norm < 4)
+  {
+    tmp = (zx * zx) - (zy * zy) + cx; // Real part
+    zy = (2. * zx * zy) + cy;         // Imag part
+    zx = tmp;
     j++;
-    norm = (zx*zx + zy*zy);
+    norm = (zx * zx + zy * zy);
   }
 
-  return (double) j;
+  return (double)j;
 
 } // compute_nb_iters
 
-namespace {
+namespace
+{
 
 bool VERBOSE = false;
 
 /**
  * Minimalist metadata to stored in hash table for AMR.
  */
-struct metadata_t {
+struct metadata_t
+{
 
   //! genuine Morton key (space location + tree encoding)
   morton_key_t key;
@@ -125,12 +128,19 @@ struct metadata_t {
 
 
   KOKKOS_INLINE_FUNCTION
-  metadata_t() :
-    key(), index(-1), data(0.0), status(CELL_INVALID) {}
+  metadata_t()
+    : key()
+    , index(-1)
+    , data(0.0)
+    , status(CELL_INVALID)
+  {}
 
   KOKKOS_INLINE_FUNCTION
-  metadata_t(morton_key_t _key, int64_t _index, double _data, CellStatus _status) :
-    key(_key), index(_index), data(_data), status(_status)
+  metadata_t(morton_key_t _key, int64_t _index, double _data, CellStatus _status)
+    : key(_key)
+    , index(_index)
+    , data(_data)
+    , status(_status)
   {}
 
 }; // struct metadata_t
@@ -793,7 +803,7 @@ struct VtkWriter : public MandelbrotConfig<ExecutionSpace>
 // =========================================================================
 // =========================================================================
 /**
- * Driver function for Mandelbrot set computation.
+ * Driver class for Mandelbrot set computation.
  */
 template <typename ExecutionSpace>
 struct MandelbrotCompute : public MandelbrotConfig<ExecutionSpace>
